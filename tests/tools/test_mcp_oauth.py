@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock, AsyncMock
 
 import pytest
+from pydantic import BaseModel, AnyUrl
 
 from tools.mcp_oauth import (
     HermesTokenStorage,
@@ -64,6 +65,29 @@ class TestHermesTokenStorage:
 
         client_path = tmp_path / "mcp-tokens" / "test-server.client.json"
         assert client_path.exists()
+
+    def test_serializes_anyurl_client_info(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        storage = HermesTokenStorage("test-server")
+        import asyncio
+
+        class ClientInfo(BaseModel):
+            client_id: str
+            redirect_uri: AnyUrl
+
+        asyncio.run(
+            storage.set_client_info(
+                ClientInfo(
+                    client_id="hermes-123",
+                    redirect_uri="https://example.com/callback",
+                )
+            )
+        )
+
+        client_path = tmp_path / "mcp-tokens" / "test-server.client.json"
+        data = json.loads(client_path.read_text())
+        assert data["client_id"] == "hermes-123"
+        assert data["redirect_uri"] == "https://example.com/callback"
 
     def test_remove_cleans_up(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
