@@ -89,6 +89,34 @@ class TestHermesTokenStorage:
         assert data["client_id"] == "hermes-123"
         assert data["redirect_uri"] == "https://example.com/callback"
 
+    def test_serializes_real_oauth_client_info_urls(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+        storage = HermesTokenStorage("test-server")
+        import asyncio
+
+        try:
+            from mcp.shared.auth import OAuthClientInformationFull
+        except ImportError:
+            pytest.skip("MCP SDK auth not available")
+
+        asyncio.run(
+            storage.set_client_info(
+                OAuthClientInformationFull(
+                    client_id="hermes-123",
+                    client_secret="secret",
+                    redirect_uris=["https://example.com/callback"],
+                    grant_types=["authorization_code"],
+                    response_types=["code"],
+                )
+            )
+        )
+
+        client_path = tmp_path / "mcp-tokens" / "test-server.client.json"
+        data = json.loads(client_path.read_text())
+        assert data["client_id"] == "hermes-123"
+        assert data["client_secret"] == "secret"
+        assert data["redirect_uris"] == ["https://example.com/callback"]
+
     def test_remove_cleans_up(self, tmp_path, monkeypatch):
         monkeypatch.setenv("HERMES_HOME", str(tmp_path))
         storage = HermesTokenStorage("test-server")
